@@ -1,0 +1,211 @@
+--// SCRIPT HUB
+
+local Players = game:GetService("Players")
+local UIS = game:GetService("UserInputService")
+
+local player = Players.LocalPlayer
+local PlayerGui = player:WaitForChild("PlayerGui")
+
+-- GUI
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "QoLHub"
+ScreenGui.ResetOnSpawn = false
+ScreenGui.Parent = PlayerGui
+
+-- Main
+local Main = Instance.new("Frame")
+Main.Size = UDim2.new(0,420,0,360)
+Main.Position = UDim2.new(0.5,-210,0.5,-180)
+Main.BackgroundColor3 = Color3.fromRGB(28,28,28)
+Main.BorderSizePixel = 0
+Main.Parent = ScreenGui
+
+-- Top
+local Top = Instance.new("Frame")
+Top.Size = UDim2.new(1,0,0,40)
+Top.BackgroundColor3 = Color3.fromRGB(20,20,20)
+Top.Parent = Main
+
+local Title = Instance.new("TextLabel")
+Title.Text = "QoL Script Hub"
+Title.Font = Enum.Font.GothamBold
+Title.TextSize = 18
+Title.TextColor3 = Color3.new(1,1,1)
+Title.BackgroundTransparency = 1
+Title.Size = UDim2.new(1,0,1,0)
+Title.Parent = Top
+
+-- Close
+local Close = Instance.new("TextButton")
+Close.Text = "X"
+Close.Size = UDim2.new(0,40,1,0)
+Close.Position = UDim2.new(1,-40,0,0)
+Close.BackgroundColor3 = Color3.fromRGB(200,70,70)
+Close.TextColor3 = Color3.new(1,1,1)
+Close.Parent = Top
+
+-- Minimize
+local Min = Instance.new("TextButton")
+Min.Text = "-"
+Min.Size = UDim2.new(0,40,1,0)
+Min.Position = UDim2.new(1,-80,0,0)
+Min.BackgroundColor3 = Color3.fromRGB(90,90,90)
+Min.TextColor3 = Color3.new(1,1,1)
+Min.Parent = Top
+
+-- Search
+local Search = Instance.new("TextBox")
+Search.PlaceholderText = "Search scripts..."
+Search.Size = UDim2.new(1,-20,0,30)
+Search.Position = UDim2.new(0,10,0,50)
+Search.BackgroundColor3 = Color3.fromRGB(45,45,45)
+Search.TextColor3 = Color3.new(1,1,1)
+Search.Parent = Main
+
+-- Scroll
+local Scroll = Instance.new("ScrollingFrame")
+Scroll.Size = UDim2.new(1,-20,1,-100)
+Scroll.Position = UDim2.new(0,10,0,90)
+Scroll.CanvasSize = UDim2.new(0,0,0,0)
+Scroll.ScrollBarThickness = 6
+Scroll.BackgroundTransparency = 1
+Scroll.Parent = Main
+
+local Layout = Instance.new("UIListLayout")
+Layout.Padding = UDim.new(0,6)
+Layout.Parent = Scroll
+
+-- Notification
+local function notify(text)
+    local n = Instance.new("TextLabel")
+    n.Size = UDim2.new(0,200,0,40)
+    n.Position = UDim2.new(1,-210,1,-50)
+    n.BackgroundColor3 = Color3.fromRGB(40,40,40)
+    n.TextColor3 = Color3.new(1,1,1)
+    n.Text = text
+    n.Parent = ScreenGui
+    task.wait(2)
+    n:Destroy()
+end
+
+-- Script list
+local Scripts = {
+
+{name="spoof skills",url="https://raw.githubusercontent.com/tornfiber/rblx/refs/heads/main/spoof_skills"},
+{name="silent aim",url="https://raw.githubusercontent.com/tornfiber/rblx/refs/heads/main/silentaim"},
+{name="quick harvest",url="https://raw.githubusercontent.com/tornfiber/rblx/refs/heads/main/quickharvest"},
+{name="quick destroy",url="https://raw.githubusercontent.com/tornfiber/rblx/refs/heads/main/quickdestroy"},
+{name="quick build",url="https://raw.githubusercontent.com/tornfiber/rblx/refs/heads/main/quickbuild"},
+{name="no cooldown",url="https://raw.githubusercontent.com/tornfiber/rblx/refs/heads/main/no_cooldown"},
+{name="mass plant",url="https://raw.githubusercontent.com/tornfiber/rblx/refs/heads/main/massplant"},
+{name="build any gui",url="https://raw.githubusercontent.com/tornfiber/rblx/refs/heads/main/buildanygui"},
+{name="auto build",url="https://raw.githubusercontent.com/tornfiber/rblx/refs/heads/main/autobuild"},
+
+}
+
+-- Create buttons
+local function createScript(script)
+
+    local Frame = Instance.new("Frame")
+    Frame.Size = UDim2.new(1,0,0,40)
+    Frame.BackgroundColor3 = Color3.fromRGB(40,40,40)
+    Frame.Parent = Scroll
+
+    local Name = Instance.new("TextLabel")
+    Name.Text = script.name
+    Name.Size = UDim2.new(0.5,0,1,0)
+    Name.BackgroundTransparency = 1
+    Name.TextColor3 = Color3.new(1,1,1)
+    Name.Parent = Frame
+
+    local Run = Instance.new("TextButton")
+    Run.Text = "Execute"
+    Run.Size = UDim2.new(0,80,0,30)
+    Run.Position = UDim2.new(1,-170,0.5,-15)
+    Run.BackgroundColor3 = Color3.fromRGB(80,130,255)
+    Run.TextColor3 = Color3.new(1,1,1)
+    Run.Parent = Frame
+
+    local Copy = Instance.new("TextButton")
+    Copy.Text = "Copy"
+    Copy.Size = UDim2.new(0,70,0,30)
+    Copy.Position = UDim2.new(1,-80,0.5,-15)
+    Copy.BackgroundColor3 = Color3.fromRGB(80,80,80)
+    Copy.TextColor3 = Color3.new(1,1,1)
+    Copy.Parent = Frame
+
+    Run.MouseButton1Click:Connect(function()
+
+        notify("Loading "..script.name)
+
+        local code = game:HttpGet(script.url)
+        loadstring(code)()
+
+        notify("Executed "..script.name)
+
+    end)
+
+    Copy.MouseButton1Click:Connect(function()
+
+        setclipboard(script.url)
+        notify("Copied link")
+
+    end)
+
+end
+
+-- Load scripts
+for _,s in ipairs(Scripts) do
+    createScript(s)
+end
+
+Scroll.CanvasSize = UDim2.new(0,0,0,#Scripts*46)
+
+-- Dragging
+local dragging=false
+local dragStart
+local startPos
+
+Top.InputBegan:Connect(function(input)
+if input.UserInputType==Enum.UserInputType.MouseButton1 then
+dragging=true
+dragStart=input.Position
+startPos=Main.Position
+end
+end)
+
+Top.InputEnded:Connect(function(input)
+if input.UserInputType==Enum.UserInputType.MouseButton1 then
+dragging=false
+end
+end)
+
+UIS.InputChanged:Connect(function(input)
+
+if dragging then
+local delta=input.Position-dragStart
+Main.Position=UDim2.new(
+startPos.X.Scale,
+startPos.X.Offset+delta.X,
+startPos.Y.Scale,
+startPos.Y.Offset+delta.Y
+)
+end
+
+end)
+
+-- Close
+Close.MouseButton1Click:Connect(function()
+ScreenGui:Destroy()
+end)
+
+-- Minimize
+local minimized=false
+
+Min.MouseButton1Click:Connect(function()
+
+minimized=not minimized
+Scroll.Visible=not minimized
+Search.Visible=not minimized
+
+end)
