@@ -1,0 +1,185 @@
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local PathfindingService = game:GetService("PathfindingService")
+
+local LocalPlayer = Players.LocalPlayer
+
+local UI_NAME = "GeminiTurboUI"
+local auraEnabled = false
+local legitModeEnabled = false
+local walkEnabled = false
+
+local auraRange = 150 
+local rng = Random.new()
+local legitCooldown = rng:NextNumber(0.8, 1.5)
+
+local buildFolder = workspace:WaitForChild("Buildings")
+local remote = ReplicatedStorage:WaitForChild("RemoteEvents"):WaitForChild("RemoteEvent_Hammer")
+
+-- Anti-lag
+local processedParts = {} 
+local PART_COOLDOWN = .5 
+local lastCleanup = os.clock()
+local lastFireTime = 0
+
+-- Walk settings
+local lastMoveTarget = nil
+local MOVE_THRESHOLD = 15
+
+-- ================= VALIDATION =================
+local function isValid(obj)
+	if not obj or not obj:IsDescendantOf(buildFolder) or not obj:IsA("BasePart") then return false end
+	if math.abs(obj.Transparency - 0.4) > 0.01 then return false end
+	
+	local name = obj.Name
+	local blacklist = {ClearArea = true, Blueprint = true, Hitbox = true, Box = true, Boundary = true}
+	return not blacklist[name]
+end
+
+-- ================= CLEAN OLD UI =================
+local oldUI = LocalPlayer.PlayerGui:FindFirstChild(UI_NAME)
+if oldUI then oldUI:Destroy() end
+
+local screenGui = Instance.new("ScreenGui", LocalPlayer.PlayerGui)
+screenGui.Name = UI_NAME
+
+-- ================= AURA BUTTON =================
+local auraBtn = Instance.new("TextButton", screenGui)
+auraBtn.Size = UDim2.new(0, 200, 0, 40)
+auraBtn.Position = UDim2.new(0.5, -100, 0.8, -90)
+auraBtn.Text = "AURA: OFF"
+auraBtn.BackgroundColor3 = Color3.new(1, 0, 0)
+auraBtn.TextColor3 = Color3.new(1, 1, 1)
+
+auraBtn.MouseButton1Click:Connect(function()
+	auraEnabled = not auraEnabled
+	auraBtn.Text = auraEnabled and "AURA: ACTIVE" or "AURA: OFF"
+	auraBtn.BackgroundColor3 = auraEnabled and Color3.new(0, 0.7, 0) or Color3.new(1, 0, 0)
+end)
+
+-- ================= LEGIT BUTTON =================
+local legitBtn = Instance.new("TextButton", screenGui)
+legitBtn.Size = UDim2.new(0, 200, 0, 40)
+legitBtn.Position = UDim2.new(0.5, -100, 0.8, -45)
+legitBtn.Text = "LEGIT MODE: OFF"
+legitBtn.BackgroundColor3 = Color3.new(0.3, 0.3, 0.3)
+legitBtn.TextColor3 = Color3.new(1, 1, 1)
+
+legitBtn.MouseButton1Click:Connect(function()
+	legitModeEnabled = not legitModeEnabled
+	legitBtn.Text = legitModeEnabled and "LEGIT MODE: ON" or "LEGIT MODE: OFF"
+	legitBtn.BackgroundColor3 = legitModeEnabled and Color3.new(0, 0.5, 1) or Color3.new(0.3, 0.3, 0.3)
+end)
+
+-- ================= WALK BUTTON =================
+local walkBtn = Instance.new("TextButton", screenGui)
+walkBtn.Size = UDim2.new(0, 200, 0, 40)
+walkBtn.Position = UDim2.new(0.5, -100, 0.8, 0)
+walkBtn.Text = "AUTO WALK: OFF"
+walkBtn.BackgroundColor3 = Color3.new(0.4, 0.2, 0.6)
+walkBtn.TextColor3 = Color3.new(1, 1, 1)
+
+walkBtn.MouseButton1Click:Connect(function()
+	walkEnabled = not walkEnabled
+	walkBtn.Text = walkEnabled and "AUTO WALK: ON" or "AUTO WALK: OFF"
+	walkBtn.BackgroundColor3 = walkEnabled and Color3.new(0.6, 0.3, 1) or Color3.new(0.4, 0.2, 0.6)
+end)
+
+-- ================= WALK FUNCTION =================
+local function walkToTarget(humanoid, hrp, targetPart)
+	if not walkEnabled then
+		humanoid:MoveTo(hrp.Position) -- cancel
+		return
+	end
+	
+	if not targetPart or not targetPart.Parent then
+		humanoid:MoveTo(hrp.Position)
+		return
+	end
+
+	local targetPos = targetPart.Position
+	local direction = (targetPos - hrp.Position)
+	local distance = direction.Magnitude
+
+	if distance <= MOVE_THRESHOLD then
+		humanoid:MoveTo(hrp.Position) -- hard cancel
+		return
+	end
+
+	direction = direction.Unit
+
+	-- 🎯 NEW: stop MOVE_THRESHOLD studs away
+	local stopPosition = targetPos - (direction * MOVE_THRESHOLD)
+
+	-- Prevent jitter spam
+	if lastMoveTarget and (lastMoveTarget - stopPosition).Magnitude < 2 then
+		return
+	end
+
+	lastMoveTarget = stopPosition
+	humanoid:MoveTo(stopPosition)
+end
+-- ================= MAIN LOOP =================
+task.spawn(function()
+	while task.wait(0.1) do
+		
+		if not screenGui or not screenGui.Parent then 
+			break 
+		end
+
+		if not auraEnabled then continue end
+		
+		-- Cleanup processed parts
+		if os.clock() - lastCleanup > 5 then
+			for part, timeHit in pairs(processedParts) do
+				if os.clock() - timeHit > PART_COOLDOWN then
+					processedParts[part] = nil
+				end
+			end
+			lastCleanup = os.clock()
+		end
+		
+		local char = LocalPlayer.Character
+		local hrp = char and char:FindFirstChild("HumanoidRootPart")
+		local humanoid = char and char:FindFirstChildOfClass("Humanoid")
+		if not hrp or not humanoid then continue end
+
+		local overlapParams = OverlapParams.new()
+		overlapParams.FilterType = Enum.RaycastFilterType.Include
+		overlapParams.FilterDescendantsInstances = {buildFolder}
+		
+		local nearbyParts = workspace:GetPartBoundsInRadius(hrp.Position, auraRange, overlapParams)
+		
+		local closestPart = nil
+		local shortestDistance = math.huge 
+
+		for _, part in ipairs(nearbyParts) do
+			if isValid(part) then
+				local distance = (part.Position - hrp.Position).Magnitude
+				if distance < shortestDistance then
+					shortestDistance = distance
+					closestPart = part
+				end
+			end
+		end
+
+		if closestPart then
+			
+			-- WALK
+			walkToTarget(humanoid, hrp, closestPart)
+
+			-- HIT LOGIC
+			local currentTime = os.clock()
+			local lastHit = processedParts[closestPart]
+			
+			local isLegitReady = not legitModeEnabled or (currentTime - lastFireTime >= legitCooldown)
+			local isPartReady = not lastHit or (currentTime - lastHit > PART_COOLDOWN)
+
+			if isLegitReady and isPartReady then
+				processedParts[closestPart] = currentTime
+				lastFireTime = currentTime
+				remote:FireServer(closestPart)
+			end
+		end
+	end
+end)
