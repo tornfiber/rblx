@@ -1,0 +1,105 @@
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local LocalPlayer = Players.LocalPlayer
+
+-- 1. REMOTE SETUP
+local CraftRemote = ReplicatedStorage:WaitForChild("RemoteEvents"):WaitForChild("RemoteEvent_Craft")
+
+-- 2. CLEANUP (Self-Destruct)
+local success, coreGui = pcall(function() return game:GetService("CoreGui") end)
+local targetParent = (success and coreGui) and coreGui or LocalPlayer:WaitForChild("PlayerGui")
+if targetParent:FindFirstChild("GeminiCrafter") then targetParent.GeminiCrafter:Destroy() end
+
+-- 3. GUI SETUP
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "GeminiCrafter"
+screenGui.ResetOnSpawn = false
+screenGui.Parent = targetParent
+
+local mainFrame = Instance.new("Frame", screenGui)
+mainFrame.Size = UDim2.new(0, 180, 0, 220) -- Slightly taller for button list
+mainFrame.Position = UDim2.new(0.5, 100, 0.5, -110) -- Offsets it from the teleporter
+mainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+mainFrame.BorderSizePixel = 0
+Instance.new("UICorner", mainFrame).CornerRadius = UDim.new(0, 6)
+
+-- Dragging Logic
+local dragging, dragInput, dragStart, startPos
+mainFrame.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragging = true; dragStart = input.Position; startPos = mainFrame.Position
+    end
+end)
+UserInputService.InputChanged:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseMovement and dragging then
+        local delta = input.Position - dragStart
+        mainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+    end
+end)
+UserInputService.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then dragging = false end
+end)
+
+-- Header
+local title = Instance.new("TextLabel", mainFrame)
+title.Size = UDim2.new(1, 0, 0, 30)
+title.Text = "AUTO-CRAFTER"
+title.TextColor3 = Color3.fromRGB(255, 255, 255)
+title.BackgroundTransparency = 1
+title.Font = Enum.Font.GothamBold
+title.TextSize = 11
+
+local statusLabel = Instance.new("TextLabel", mainFrame)
+statusLabel.Size = UDim2.new(1, 0, 0, 20)
+statusLabel.Position = UDim2.new(0, 0, 1, -20)
+statusLabel.Text = "Ready [ \ ]"
+statusLabel.TextColor3 = Color3.fromRGB(150, 150, 150)
+statusLabel.BackgroundTransparency = 1
+statusLabel.TextSize = 10
+
+-- 4. BUTTONS & LOGIC
+local items = {
+    {Name = "Hammer", Location = "forge"},
+    {Name = "Pickaxe", Location = "forge"},
+    {Name = "Axe", Location = "forge"},
+    {Name = "Gun", Location = "forge"},
+    {Name = "Shovel", Location = "forge"},
+    {Name = "TNT", Location = "table"} -- Special logic applied
+}
+
+local function createButton(itemData, index)
+    local btn = Instance.new("TextButton", mainFrame)
+    btn.Size = UDim2.new(1, -16, 0, 25)
+    btn.Position = UDim2.new(0, 8, 0, 30 + (index * 28))
+    btn.Text = itemData.Name:upper()
+    btn.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+    btn.TextColor3 = Color3.fromRGB(200, 200, 200)
+    btn.BorderSizePixel = 0
+    btn.Font = Enum.Font.Gotham
+    btn.TextSize = 10
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 4)
+
+    btn.MouseButton1Click:Connect(function()
+        statusLabel.Text = "Crafting " .. itemData.Name .. "..."
+        CraftRemote:FireServer(itemData.Name, itemData.Location)
+        
+        task.delay(1, function()
+            statusLabel.Text = "Finished!"
+            task.wait(1)
+            statusLabel.Text = "Ready [ \ ]"
+        end)
+    end)
+end
+
+for i, data in ipairs(items) do
+    createButton(data, i-1)
+end
+
+-- 5. TOGGLE KEYBIND
+UserInputService.InputBegan:Connect(function(input, processed)
+    if processed then return end
+    if input.KeyCode == Enum.KeyCode.BackSlash then -- "\" key to toggle
+        mainFrame.Visible = not mainFrame.Visible
+    end
+end)
