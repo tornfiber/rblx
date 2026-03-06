@@ -1,0 +1,115 @@
+-- --- AUTO-CLEANUP (DESTROY OLD SCRIPT) ---
+if _G.GunScriptCleanup then
+    _G.GunScriptCleanup()
+end
+
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+local ContextActionService = game:GetService("ContextActionService")
+
+local LocalPlayer = Players.LocalPlayer
+local Camera = workspace.CurrentCamera
+
+-- --- CONFIGURATION ---
+local FOV_LIMIT = 100
+local COOLDOWN = 0.0
+local lastShot = 0
+
+-- --- FOV CIRCLE SETUP ---
+local FOVCircle = Drawing.new("Circle")
+FOVCircle.Visible = false -- Start invisible
+FOVCircle.Thickness = 1.5
+FOVCircle.Radius = FOV_LIMIT
+FOVCircle.Color = Color3.fromRGB(0, 255, 255)
+FOVCircle.Filled = false
+FOVCircle.Transparency = 1
+
+-- --- UTILITY: FIND THE GUN REMOTE ---
+local function getRemote()
+    local char = LocalPlayer.Character
+    local gun = char and char:FindFirstChild("Gun")
+    return gun and gun:FindFirstChild("RemoteEvent_Gun")
+end
+
+-- --- LOGIC: FIND TARGET ---
+local function getClosestPlayerToCursor()
+    local closestPlayer = nil
+    local shortestDistance = FOV_LIMIT
+    local mousePos = UserInputService:GetMouseLocation()
+
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Character then
+            local head = player.Character:FindFirstChild("Head")
+            local hum = player.Character:FindFirstChild("Humanoid")
+            
+            if head and hum and hum.Health > 0 then
+                local screenPos, onScreen = Camera:WorldToViewportPoint(head.Position)
+
+                if onScreen then
+                    local distance = (Vector2.new(screenPos.X, screenPos.Y) - mousePos).Magnitude
+                    if distance < shortestDistance then
+                        closestPlayer = player
+                        shortestDistance = distance
+                    end
+                end
+            end
+        end
+    end
+    return closestPlayer
+end
+
+-- --- INPUT HANDLER ---
+local function handleAction(actionName, inputState, inputObject)
+    if inputState == Enum.UserInputState.Begin then
+        local remote = getRemote()
+        if not remote then return Enum.ContextActionResult.Pass end
+
+        local currentTime = os.clock()
+        if currentTime - lastShot >= COOLDOWN then
+            lastShot = currentTime
+
+            local targetPlayer = getClosestPlayerToCursor()
+            local targetPos
+            
+            if targetPlayer and targetPlayer.Character:FindFirstChild("Head") then
+                targetPos = targetPlayer.Character.Head.Position
+            else
+                targetPos = LocalPlayer:GetMouse().Hit.Position
+            end
+
+            local origin = LocalPlayer.Character and LocalPlayer.Character.Head.Position
+            if not origin then return Enum.ContextActionResult.Pass end
+            
+            local direction = (targetPos - origin).Unit
+            local args = {
+                vector.create(origin.X, origin.Y, origin.Z),
+                vector.create(direction.X, direction.Y, direction.Z)
+            }
+
+            remote:FireServer(unpack(args))
+        end
+        return Enum.ContextActionResult.Sink
+    end
+    return Enum.ContextActionResult.Pass
+end
+
+ContextActionService:BindActionAtPriority("CustomGunAction", handleAction, false, 2000, Enum.UserInputType.MouseButton1)
+
+-- --- UPDATE LOOP & CLEANUP REGISTRY ---
+local connection = RunService.RenderStepped:Connect(function()
+    local mousePos = UserInputService:GetMouseLocation()
+    FOVCircle.Position = mousePos
+    
+    -- Only show circle if holding the gun
+    local remote = getRemote()
+    FOVCircle.Visible = (remote ~= nil)
+end)
+
+-- This function runs when you re-execute the script
+_G.GunScriptCleanup = function()
+    connection:Disconnect()
+    FOVCircle:Remove()
+    ContextActionService:UnbindAction("CustomGunAction")
+    _G.GunScriptCleanup = nil
+end
