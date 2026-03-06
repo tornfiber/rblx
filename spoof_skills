@@ -1,0 +1,24 @@
+local player = game:GetService("Players").LocalPlayer
+local stats = player:WaitForChild("stats")
+
+-- 1e12 is shorthand for 1 followed by 12 zeros (1 Trillion)
+local targetValue = 9.223e18 
+
+local targetStats = {
+    "chopping", "mining", "crafting", "farming", "building"
+ }
+
+for _, statName in pairs(targetStats) do
+    local statObject = stats:FindFirstChild(statName)
+    if statObject then
+        statObject.Value = targetValue
+        
+        statObject.Changed:Connect(function(val)
+            if val ~= targetValue then
+                statObject.Value = targetValue
+            end
+        end)
+    end
+end
+
+
