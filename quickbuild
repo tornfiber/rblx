@@ -1,0 +1,93 @@
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Players = game:GetService("Players")
+
+local BuildRemote = ReplicatedStorage:WaitForChild("RemoteEvents"):WaitForChild("RemoteEvent_Build")
+local WallModel = ReplicatedStorage:WaitForChild("Structures"):WaitForChild("Wall")
+local Hammer = Players.LocalPlayer.Character:WaitForChild("Hammer")
+
+-- ===== PLOT SETTINGS =====
+local PLOT_CENTER = Vector3.new(-799, 185.73082, -466)
+local PLOT_SIZE = 220
+local HALF_SIZE = PLOT_SIZE / 2
+
+-- move walls inward from plot border
+local INSET = 6
+
+-- how many wall segments to remove for the gate
+local GATE_SIZE = 3
+
+-- ===== GET REAL MODEL SIZE =====
+local size = WallModel:GetExtentsSize()
+
+local WALL_LENGTH = size.Z
+local WALL_HEIGHT = size.Y
+
+local buildY = PLOT_CENTER.Y + (WALL_HEIGHT / 2)
+
+-- plot bounds (inset inward)
+local minX = PLOT_CENTER.X - HALF_SIZE + INSET
+local maxX = PLOT_CENTER.X + HALF_SIZE - INSET
+local minZ = PLOT_CENTER.Z - HALF_SIZE + INSET
+local maxZ = PLOT_CENTER.Z + HALF_SIZE - INSET
+
+local function placeWall(cf)
+	BuildRemote:FireServer(WallModel, cf, Hammer)
+	task.wait(0.03)
+end
+
+-- =====================================================
+-- FRONT / BACK
+-- =====================================================
+local function buildRow(zPos, makeGate)
+
+	local usableLength = maxX - minX
+	local count = math.round(usableLength / WALL_LENGTH)
+	local trueStep = usableLength / count
+
+	-- gate center
+	local gateStart = math.floor(count/2) - math.floor(GATE_SIZE/2)
+	local gateEnd = gateStart + GATE_SIZE - 1
+
+	for i = 0, count - 1 do
+		
+		-- skip walls for gate
+		if makeGate and i >= gateStart and i <= gateEnd then
+			continue
+		end
+		
+		local x = minX + (trueStep/2) + (i * trueStep)
+		local cf = CFrame.new(x, buildY, zPos) * CFrame.Angles(0, math.rad(90), 0)
+		
+		placeWall(cf)
+	end
+end
+
+-- =====================================================
+-- LEFT / RIGHT
+-- =====================================================
+local function buildColumn(xPos)
+
+	local usableLength = maxZ - minZ
+	local count = math.round(usableLength / WALL_LENGTH)
+	local trueStep = usableLength / count
+
+	for i = 0, count - 1 do
+		
+		local z = minZ + (trueStep/2) + (i * trueStep)
+		local cf = CFrame.new(xPos, buildY, z)
+		
+		placeWall(cf)
+	end
+end
+
+-- =====================================================
+-- BUILD WALLS
+-- =====================================================
+
+buildRow(minZ, true)   -- FRONT (has gate)
+buildRow(maxZ, false)  -- BACK
+
+buildColumn(minX)      -- LEFT
+buildColumn(maxX)      -- RIGHT
+
+print("Box built with gate opening.")
