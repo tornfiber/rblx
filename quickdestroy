@@ -1,0 +1,53 @@
+local player = game.Players.LocalPlayer
+local mouse = player:GetMouse()
+local replicatedStorage = game:GetService("ReplicatedStorage")
+local configureRemote = replicatedStorage:WaitForChild("RemoteEvents"):WaitForChild("RemoteEvent_Configure")
+
+-- Configuration
+local destroyMode = false
+local radius = 100 -- Range in studs
+
+-- Function to find and destroy models in range
+mouse.Button1Down:Connect(function()
+    if not destroyMode then return end
+    
+    local clickPosition = mouse.Hit.Position
+    if not clickPosition then return end
+
+    -- Define the overlap parameters (optional: filters out players)
+    local params = OverlapParams.new()
+    params.FilterType = Enum.RaycastFilterType.Exclude
+    params.FilterDescendantsInstances = {player.Character}
+
+    -- Find all parts within the 10-stud radius of the click
+    local nearbyParts = workspace:GetPartBoundsInRadius(clickPosition, radius, params)
+    
+    -- Use a table to track which models we've already fired for (to avoid spam)
+    local processedModels = {}
+
+    for _, part in ipairs(nearbyParts) do
+        local building = part:FindFirstAncestorOfClass("Model")
+        
+        if building and not processedModels[building] then
+            processedModels[building] = true
+            
+            print("Area Destroying: " .. building.Name)
+            
+            -- Fire the server for each unique building found
+            local args = {
+                "destroy",
+                building
+            }
+            configureRemote:FireServer(unpack(args))
+        end
+    end
+end)
+
+-- Toggle Logic (Press 'X' to enable/disable)
+game:GetService("UserInputService").InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+    if input.KeyCode == Enum.KeyCode.M then
+        destroyMode = not destroyMode
+        print("Area Destroy Mode: " .. (destroyMode and "ON" or "OFF"))
+    end
+end)
