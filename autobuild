@@ -22,7 +22,7 @@ local remote = ReplicatedStorage:WaitForChild("RemoteEvents")
 
 -- Anti-lag
 local processedParts = {}
-local PART_COOLDOWN = 0.3
+local PART_COOLDOWN = 0.1
 local lastCleanup = os.clock()
 local lastFireTime = 0
 
